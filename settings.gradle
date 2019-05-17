@@ -1,0 +1,4 @@
+gradle.ext.componentsRoot = "RoboSwag"
+apply from: "$gradle.ext.componentsRoot/modules.gradle"
+
+include ':app'
