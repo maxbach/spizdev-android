@@ -22,6 +22,7 @@ allprojects {
         google()
         jcenter()
         maven { url "http://dl.bintray.com/touchin/touchin-tools" }
+        maven { url "https://jitpack.io" }
         
     }
 }
