@@ -39,6 +39,7 @@ dependencies {
     implementation project(':templates')
     implementation project(':recyclerview-adapters')
     implementation project(':kotlin-extensions')
+    implementation project(':livedata-location')
 
     // Ktx
     implementation "androidx.core:core-ktx:$versions.kotlinExt"
@@ -58,5 +59,7 @@ dependencies {
 
     implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.0.0"
     implementation "androidx.lifecycle:lifecycle-livedata:2.0.0"
+
+    implementation "com.google.android.gms:play-services-location:$versions.location"
 
 }
