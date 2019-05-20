@@ -7,10 +7,11 @@
         android:layout_height="match_parent"
         tools:context=".MainActivity">
 
-    <TextView
+    <Button
         android:id="@+id/main_activity_start_service"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:textColor="@color/colorAccent"
         android:text="START SERVICE"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
