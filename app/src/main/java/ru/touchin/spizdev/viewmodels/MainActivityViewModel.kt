@@ -8,14 +8,15 @@ import android.os.Build
 import android.provider.Settings
 import androidx.annotation.RequiresApi
 import androidx.annotation.RequiresPermission
+import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
+import androidx.lifecycle.ViewModel
 import com.google.android.gms.location.LocationRequest
 import io.reactivex.Completable
 import ru.touchin.lifecycle.event.Event
-import ru.touchin.lifecycle.viewmodel.RxViewModel
+import ru.touchin.lifecycle.viewmodel.*
 import ru.touchin.livedata.location.LocationLiveData
-import ru.touchin.spizdev.MainActivity
 import ru.touchin.spizdev.api.RetrofitController
 import ru.touchin.spizdev.logic.Preferences
 import ru.touchin.spizdev.models.GpsPosition
@@ -23,7 +24,10 @@ import ru.touchin.spizdev.models.Phone
 import ru.touchin.spizdev.models.SendStampBody
 import ru.touchin.spizdev.models.enums.PhoneOs
 
-class MainActivityViewModel : RxViewModel() {
+class MainActivityViewModel (
+    private val destroyable: BaseDestroyable = BaseDestroyable(),
+    private val liveDataDispatcher: AsyncLiveDataDispatcher = AsyncLiveDataDispatcher(destroyable)
+) : ViewModel(), Destroyable by destroyable, LiveDataDispatcher by liveDataDispatcher {
 
     private lateinit var context: Context
 
@@ -32,10 +36,15 @@ class MainActivityViewModel : RxViewModel() {
     private val wiFiLiveData by lazy { WiFiLiveData(context) }
 
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
-    fun observeLiveData(activity: MainActivity) {
-        this.context = activity
-        liveDataLocation.observe(activity, Observer { })
-        wiFiLiveData.observe(activity, Observer { })
+    fun observeLiveData(service: LifecycleService) {
+        this.context = service.applicationContext
+        liveDataLocation.observe(service, Observer { })
+        wiFiLiveData.observe(service, Observer { })
+    }
+
+    fun removeObservers(service: LifecycleService) {
+        liveDataLocation.removeObservers(service)
+        wiFiLiveData.removeObservers(service)
     }
 
     @SuppressLint("HardwareIds")
@@ -69,6 +78,10 @@ class MainActivityViewModel : RxViewModel() {
                 )
                 .dispatchTo(sendStampProgress)
         }
+    }
+
+    fun onDestroy() {
+        destroyable.onDestroy()
     }
 
     @SuppressLint("HardwareIds")
