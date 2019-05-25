@@ -2,12 +2,15 @@ package ru.touchin.spizdev
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.app.*
+import android.app.AlarmManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import android.os.IBinder
 import android.os.SystemClock
 import android.widget.Toast
 import androidx.annotation.RequiresPermission
@@ -34,16 +37,15 @@ class MainService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
+        val initNotification = getInitNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             createNotificationChannel()
             startForeground(
-                NOTIFICATION_CODE, NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_CODE)
-                    .setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle("Touchin Device Manager")
-                    .setContentText("Следим за тобой и за тем, где находится девайс")
-                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                    .build()
-            );
+                NOTIFICATION_CODE, initNotification
+            )
+        } else {
+            (getSystemService(Service.NOTIFICATION_SERVICE) as NotificationManager)
+                .notify(NOTIFICATION_CODE, initNotification)
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
             != PackageManager.PERMISSION_GRANTED
@@ -60,6 +62,9 @@ class MainService : LifecycleService() {
         super.onDestroy()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             stopForeground(true)
+        } else {
+            (getSystemService(Service.NOTIFICATION_SERVICE) as NotificationManager)
+                .cancel(NOTIFICATION_CODE)
         }
         timer.cancel()
         viewModel.onDestroy()
@@ -70,7 +75,7 @@ class MainService : LifecycleService() {
     private fun createNotificationWithPermissionRequest() {
         PermissionEverywhere.getPermission(
             applicationContext,
-            arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION),
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
             REQ_CODE,
             "PERMISSSIONS",
             "This app needs a location permission",
@@ -105,7 +110,7 @@ class MainService : LifecycleService() {
 
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     private fun observeAndStartTimer() {
-        viewModel.observeLiveData(this)
+        viewModel.observeLiveData(this, this)
         viewModel.sendStampProgress.observe(this, Observer {
             Toast.makeText(this, it.toString(), Toast.LENGTH_LONG).show()
         })
@@ -131,5 +136,12 @@ class MainService : LifecycleService() {
             notificationManager.createNotificationChannel(channel)
         }
     }
+
+    private fun getInitNotification() = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_CODE)
+        .setSmallIcon(R.mipmap.ic_launcher)
+        .setContentTitle("Touchin Device Manager")
+        .setContentText("Следим за тобой и за тем, где находится девайс")
+        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+        .build()
 
 }
