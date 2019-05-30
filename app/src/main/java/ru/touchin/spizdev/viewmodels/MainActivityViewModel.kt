@@ -2,7 +2,11 @@ package ru.touchin.spizdev.viewmodels
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.Build
 import android.provider.Settings
@@ -14,6 +18,8 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModel
 import com.google.android.gms.location.LocationRequest
 import io.reactivex.Completable
+import io.reactivex.Single
+import io.reactivex.SingleEmitter
 import io.reactivex.schedulers.Schedulers
 import retrofit2.HttpException
 import ru.touchin.lifecycle.event.Event
@@ -25,6 +31,7 @@ import ru.touchin.spizdev.api.RetrofitController
 import ru.touchin.spizdev.models.GpsPosition
 import ru.touchin.spizdev.models.Phone
 import ru.touchin.spizdev.models.SendStampBody
+import ru.touchin.spizdev.models.WiFiScan
 import ru.touchin.spizdev.models.enums.PhoneOs
 
 class MainActivityViewModel(
@@ -42,18 +49,15 @@ class MainActivityViewModel(
                 .setInterval(30000)
         )
     }
-    private val wiFiLiveData by lazy { WiFiLiveData(context) }
 
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     fun observeLiveData(context: Context, owner: LifecycleOwner) {
         this.context = context.applicationContext
         liveDataLocation.observe(owner, Observer { })
-        wiFiLiveData.observe(owner, Observer { })
     }
 
     fun removeObservers(owner: LifecycleOwner) {
         liveDataLocation.removeObservers(owner)
-        wiFiLiveData.removeObservers(owner)
     }
 
     @SuppressLint("HardwareIds")
@@ -81,33 +85,57 @@ class MainActivityViewModel(
 
     @SuppressLint("HardwareIds")
     @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
-    private fun sendStampCompletable(): Completable = RetrofitController.api.sendStamp(
-        SendStampBody(
-            batteryLevel = getBatteryLevel(),
-            gpsPosition = liveDataLocation.value?.let {
-                GpsPosition(
-                    it.latitude,
-                    it.longitude,
-                    it.accuracy
-                )
-            },
-            phoneId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID),
-            wiFiScans = wiFiLiveData.value.orEmpty()
+    private fun sendStampCompletable(): Completable = getWiFiScan().flatMapCompletable { wiFiScan ->
+        RetrofitController.api.sendStamp(
+            SendStampBody(
+                batteryLevel = getBatteryLevel(),
+                gpsPosition = liveDataLocation.value?.let {
+                    GpsPosition(
+                        it.latitude,
+                        it.longitude,
+                        it.accuracy
+                    )
+                },
+                phoneId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID),
+                wiFiScans = wiFiScan
+            )
         )
-    )
-        .subscribeOn(Schedulers.io())
-        .onErrorResumeNext { throwable ->
-            if (throwable is HttpException && throwable.code() == 401) {
-                login()
-                    .andThen(sendStampCompletable())
-            } else {
-                Completable.error(throwable)
+            .subscribeOn(Schedulers.io())
+            .onErrorResumeNext { throwable ->
+                if (throwable is HttpException && throwable.code() == 401) {
+                    login()
+                        .andThen(sendStampCompletable())
+                } else {
+                    Completable.error(throwable)
+                }
             }
-        }
+    }
 
 
     @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
     private fun getBatteryLevel() = (context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager)
         .getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+
+    private fun getWiFiScan(): Single<List<WiFiScan>> = Single.create { emitter: SingleEmitter<List<WiFiScan>> ->
+        val wiFiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        wiFiManager.startScan()
+        val filter = IntentFilter()
+        filter.addAction("android.net.wifi.supplicant.CONNECTION_CHANGE")
+        filter.addAction("android.net.wifi.STATE_CHANGE")
+        val broadcastReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                emitter.onSuccess(wiFiManager.scanResults.map { scanResult ->
+                    WiFiScan(
+                        scanResult.SSID,
+                        scanResult.BSSID,
+                        scanResult.frequency,
+                        scanResult.level
+                    )
+                })
+                context.unregisterReceiver(this)
+            }
+        }
+        context.registerReceiver(broadcastReceiver, filter)
+    }
 
 }

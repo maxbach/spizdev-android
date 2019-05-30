@@ -8,9 +8,12 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Observer
+import com.google.android.material.snackbar.Snackbar
 import ru.touchin.spizdev.viewmodels.MainActivityViewModel
 
 class MainActivity : AppCompatActivity() {
+
+    private val snackbar by lazy { Snackbar.make(findViewById(R.id.main_activity_parent), "Test", Snackbar.LENGTH_SHORT) }
 
     private val viewModel by lazy { MainActivityViewModel() }
 
@@ -26,7 +29,8 @@ class MainActivity : AppCompatActivity() {
         }
         viewModel.observeLiveData(this, this)
         viewModel.sendStampProgress.observe(this, Observer {
-            Toast.makeText(this, it.toString(), Toast.LENGTH_LONG).show()
+            snackbar.setText(it.toString())
+            snackbar.show()
         })
         findViewById<View>(R.id.button_send_stamp).setOnClickListener {
             viewModel.sendStamp()

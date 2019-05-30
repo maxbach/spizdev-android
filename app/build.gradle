@@ -70,4 +70,6 @@ dependencies {
 
     implementation 'com.github.kaknazaveshtakipishi:PermissionEverywhere:1.0.2'
 
+    implementation "com.android.support:design:28.1.0"
+
 }
